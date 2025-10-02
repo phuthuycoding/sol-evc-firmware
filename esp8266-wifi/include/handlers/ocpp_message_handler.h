@@ -70,11 +70,7 @@ public:
         const boot_notification_t& boot
     );
 
-private:
-    static void buildStatusTopic(char* buffer, size_t size, const DeviceConfig& config, uint8_t connectorId);
-    static void buildMeterTopic(char* buffer, size_t size, const DeviceConfig& config, uint8_t connectorId);
-    static void buildTransactionTopic(char* buffer, size_t size, const DeviceConfig& config, const char* type);
-    static void buildBootTopic(char* buffer, size_t size, const DeviceConfig& config);
+    // Note: Topic building now handled by MQTTTopicBuilder namespace
 };
 
 #endif // OCPP_MESSAGE_HANDLER_H

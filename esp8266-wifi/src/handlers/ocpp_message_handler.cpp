@@ -4,6 +4,7 @@
  */
 
 #include "handlers/ocpp_message_handler.h"
+#include "drivers/mqtt/mqtt_topic_builder.h"
 #include "utils/logger.h"
 #include <ArduinoJson.h>
 
@@ -15,7 +16,7 @@ bool OCPPMessageHandler::publishStatusNotification(
 ) {
     // Build topic
     char topic[128];
-    buildStatusTopic(topic, sizeof(topic), config, status.connector_id);
+    MQTTTopicBuilder::buildStatus(topic, sizeof(topic), config, status.connector_id);
 
     // Build JSON payload
     StaticJsonDocument<512> doc;
@@ -50,7 +51,7 @@ bool OCPPMessageHandler::publishMeterValues(
 ) {
     // Build topic
     char topic[128];
-    buildMeterTopic(topic, sizeof(topic), config, meter.connector_id);
+    MQTTTopicBuilder::buildMeter(topic, sizeof(topic), config, meter.connector_id);
 
     // Build JSON payload
     StaticJsonDocument<512> doc;
@@ -91,7 +92,7 @@ bool OCPPMessageHandler::publishStartTransaction(
 ) {
     // Build topic
     char topic[128];
-    buildTransactionTopic(topic, sizeof(topic), config, "start");
+    MQTTTopicBuilder::buildTransaction(topic, sizeof(topic), config, "start");
 
     // Build JSON payload
     StaticJsonDocument<512> doc;
@@ -125,7 +126,7 @@ bool OCPPMessageHandler::publishStopTransaction(
 ) {
     // Build topic
     char topic[128];
-    buildTransactionTopic(topic, sizeof(topic), config, "stop");
+    MQTTTopicBuilder::buildTransaction(topic, sizeof(topic), config, "stop");
 
     // Build JSON payload
     StaticJsonDocument<512> doc;
@@ -159,7 +160,7 @@ bool OCPPMessageHandler::publishBootNotification(
 ) {
     // Build topic
     char topic[128];
-    buildBootTopic(topic, sizeof(topic), config);
+    MQTTTopicBuilder::buildBoot(topic, sizeof(topic), config);
 
     // Build JSON payload
     StaticJsonDocument<512> doc;
@@ -185,23 +186,4 @@ bool OCPPMessageHandler::publishBootNotification(
     }
 }
 
-// Topic builders
-void OCPPMessageHandler::buildStatusTopic(char* buffer, size_t size, const DeviceConfig& config, uint8_t connectorId) {
-    snprintf(buffer, size, "ocpp/%s/%s/status/%d/status_notification",
-             config.stationId, config.deviceId, connectorId);
-}
-
-void OCPPMessageHandler::buildMeterTopic(char* buffer, size_t size, const DeviceConfig& config, uint8_t connectorId) {
-    snprintf(buffer, size, "ocpp/%s/%s/meter/%d/meter_values",
-             config.stationId, config.deviceId, connectorId);
-}
-
-void OCPPMessageHandler::buildTransactionTopic(char* buffer, size_t size, const DeviceConfig& config, const char* type) {
-    snprintf(buffer, size, "ocpp/%s/%s/transaction/%s",
-             config.stationId, config.deviceId, type);
-}
-
-void OCPPMessageHandler::buildBootTopic(char* buffer, size_t size, const DeviceConfig& config) {
-    snprintf(buffer, size, "ocpp/%s/%s/event/0/boot_notification",
-             config.stationId, config.deviceId);
-}
+// Topic builders removed - now using MQTTTopicBuilder namespace
