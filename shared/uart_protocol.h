@@ -27,7 +27,7 @@ extern "C" {
 #define CMD_WIFI_STATUS     0x03
 #define CMD_CONFIG_UPDATE   0x04
 #define CMD_OTA_REQUEST     0x05
-#define CMD_GET_METER_VALUES 0x06
+#define CMD_PUBLISH_METER_VALUES 0x06
 
 /* Response Types - ESP8266 to STM32 */
 #define RSP_MQTT_ACK        0x81

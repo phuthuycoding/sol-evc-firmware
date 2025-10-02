@@ -4,13 +4,18 @@
  */
 
 #include "handlers/stm32_command_handler.h"
+#include "handlers/config_update_handler.h"
+#include "handlers/ota_handler.h"
+#include "handlers/ocpp_message_handler.h"
 #include "utils/logger.h"
 #include <ArduinoJson.h>
 
 void STM32CommandHandler::execute(
     const uart_packet_t& packet,
     STM32Communicator& stm32,
-    MQTTClient& mqtt
+    MQTTClient& mqtt,
+    NTPTimeDriver& ntpTime,
+    UnifiedConfigManager& configManager
 ) {
     LOG_DEBUG("STM32Cmd", "RX: CMD=0x%02X, SEQ=%d", packet.cmd_type, packet.sequence);
 
@@ -20,11 +25,23 @@ void STM32CommandHandler::execute(
             break;
 
         case CMD_GET_TIME:
-            handleGetTime(packet, stm32);
+            handleGetTime(packet, stm32, ntpTime);
             break;
 
         case CMD_WIFI_STATUS:
             handleWiFiStatus(packet, stm32);
+            break;
+
+        case CMD_CONFIG_UPDATE:
+            handleConfigUpdate(packet, stm32, configManager);
+            break;
+
+        case CMD_OTA_REQUEST:
+            handleOTARequest(packet, stm32);
+            break;
+
+        case CMD_PUBLISH_METER_VALUES:
+            handlePublishMeterValues(packet, stm32, mqtt, configManager.get());
             break;
 
         default:
@@ -73,17 +90,18 @@ void STM32CommandHandler::handleMqttPublish(
 
 void STM32CommandHandler::handleGetTime(
     const uart_packet_t& packet,
-    STM32Communicator& stm32
+    STM32Communicator& stm32,
+    NTPTimeDriver& ntpTime
 ) {
     // Create time response packet
     uart_packet_t response;
     uart_init_packet(&response, RSP_TIME_DATA, packet.sequence);
 
-    // Build time payload
+    // Build time payload with NTP time
     time_data_payload_t timeData;
-    timeData.unix_timestamp = millis() / 1000;  // TODO: Use NTP time when available
-    timeData.timezone_offset = 0;  // UTC (TODO: Get from config)
-    timeData.ntp_synced = 0;       // Not synced yet (TODO: Check NTP status)
+    timeData.unix_timestamp = ntpTime.getUnixTime();
+    timeData.timezone_offset = ntpTime.getTimezoneOffset();
+    timeData.ntp_synced = ntpTime.isSynced() ? 1 : 0;
 
     memcpy(response.payload, &timeData, sizeof(timeData));
     response.length = sizeof(timeData);
@@ -124,4 +142,58 @@ void STM32CommandHandler::handleWiFiStatus(
     // Send response
     stm32.sendPacket(response);
     LOG_DEBUG("STM32Cmd", "WiFi status: connected=%d, RSSI=%d", wifiData.wifi_connected, wifiData.rssi);
+}
+
+void STM32CommandHandler::handleConfigUpdate(
+    const uart_packet_t& packet,
+    STM32Communicator& stm32,
+    UnifiedConfigManager& configManager
+) {
+    bool success = ConfigUpdateHandler::handleFromSTM32(packet, stm32, configManager);
+
+    if (success) {
+        LOG_INFO("STM32Cmd", "Config updated successfully");
+    } else {
+        LOG_ERROR("STM32Cmd", "Config update failed");
+    }
+}
+
+void STM32CommandHandler::handleOTARequest(
+    const uart_packet_t& packet,
+    STM32Communicator& stm32
+) {
+    OTAHandler::handleFromSTM32(packet, stm32);
+}
+
+void STM32CommandHandler::handlePublishMeterValues(
+    const uart_packet_t& packet,
+    STM32Communicator& stm32,
+    MQTTClient& mqtt,
+    const DeviceConfig& config
+) {
+    // Parse meter values from packet
+    if (packet.length < sizeof(meter_values_t)) {
+        LOG_ERROR("STM32Cmd", "Invalid meter values packet size");
+        stm32.sendAck(packet.sequence, STATUS_INVALID);
+        return;
+    }
+
+    meter_values_t meterData;
+    memcpy(&meterData, packet.payload, sizeof(meter_values_t));
+
+    LOG_DEBUG("STM32Cmd", "Meter values: E=%u Wh, V=%u V, I=%u A, P=%u W",
+             meterData.sample.energy_wh,
+             meterData.sample.voltage_mv / 1000,
+             meterData.sample.current_ma / 1000,
+             meterData.sample.power_w);
+
+    // Publish to MQTT via OCPPMessageHandler
+    bool success = OCPPMessageHandler::publishMeterValues(mqtt, config, meterData);
+
+    if (success) {
+        stm32.sendAck(packet.sequence, STATUS_SUCCESS);
+    } else {
+        LOG_ERROR("STM32Cmd", "Failed to publish meter values");
+        stm32.sendAck(packet.sequence, STATUS_ERROR);
+    }
 }

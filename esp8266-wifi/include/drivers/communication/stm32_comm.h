@@ -190,11 +190,12 @@ namespace STM32Commands {
     }
 
     /**
-     * @brief Request meter values
+     * @brief Create meter values publish packet (STM32 → ESP8266)
+     * Note: Name changed from GET to PUBLISH (STM32 pushes data)
      */
-    inline uart_packet_t createMeterValuesRequest(uint8_t sequence) {
+    inline uart_packet_t createMeterValuesPacket(uint8_t sequence) {
         uart_packet_t packet;
-        uart_init_packet(&packet, CMD_GET_METER_VALUES, sequence);
+        uart_init_packet(&packet, CMD_PUBLISH_METER_VALUES, sequence);
         packet.length = 0;
         return packet;
     }

@@ -7,6 +7,7 @@
 #include "handlers/heartbeat_handler.h"
 #include "handlers/stm32_command_handler.h"
 #include "handlers/mqtt_incoming_handler.h"
+#include "handlers/ocpp_message_handler.h"
 #include <ArduinoJson.h>
 
 // Note: All driver headers now in drivers/ subdirectory
@@ -16,7 +17,8 @@ DeviceManager* DeviceManager::instance = nullptr;
 DeviceManager::DeviceManager()
     : wifiManager(nullptr),
       mqttClient(nullptr),
-      stm32() {
+      stm32(),
+      ntpTime() {
 
     memset(&systemStatus, 0, sizeof(systemStatus));
     instance = this;
@@ -100,6 +102,9 @@ bool DeviceManager::initializeNetwork() {
         return false;
     }
 
+    // Initialize NTP time
+    ntpTime.init("pool.ntp.org", 0);  // UTC, can be configured from config later
+
     LOG_INFO("Network", "WiFi and MQTT connected");
     return true;
 }
@@ -130,6 +135,15 @@ void DeviceManager::run() {
     if (mqttClient && wifiManager && wifiManager->isConnected()) {
         mqttClient->handle();
 
+        // Update NTP time
+        ntpTime.update();
+
+        // Send boot notification (once after network ready)
+        if (!systemStatus.bootNotificationSent) {
+            handleBootNotification();
+            systemStatus.bootNotificationSent = true;
+        }
+
         // Send heartbeat
         const DeviceConfig& config = configManager.get();
         if (millis() - systemStatus.lastHeartbeat > config.system.heartbeatInterval) {
@@ -155,13 +169,27 @@ void DeviceManager::handleHeartbeat() {
 }
 
 void DeviceManager::handleMeterValues() {
-    static uint32_t lastRequest = 0;
+    // Note: Meter values are now pushed from STM32 via CMD_PUBLISH_METER_VALUES
+    // No need to request periodically
+    // STM32 sends meter data when available
+}
 
-    if (millis() - lastRequest > 5000) {
-        uart_packet_t packet = STM32Commands::createMeterValuesRequest(0);
-        stm32.sendPacket(packet);
-        lastRequest = millis();
-    }
+void DeviceManager::handleBootNotification() {
+    if (!mqttClient) return;
+
+    boot_notification_t bootData;
+    strncpy(bootData.firmware_version, FIRMWARE_VERSION, sizeof(bootData.firmware_version) - 1);
+    strncpy(bootData.station_id, configManager.get().stationId, sizeof(bootData.station_id) - 1);
+    bootData.boot_reason = 1;  // PowerUp (can be extended)
+    bootData.timestamp = ntpTime.getUnixTime();
+
+    OCPPMessageHandler::publishBootNotification(
+        *mqttClient,
+        configManager.get(),
+        bootData
+    );
+
+    LOG_INFO("DeviceManager", "Boot notification sent");
 }
 
 void DeviceManager::mqttMessageCallback(const char* topic, const char* payload, uint16_t length) {
@@ -185,7 +213,9 @@ void DeviceManager::stm32PacketCallback(const uart_packet_t* packet) {
         STM32CommandHandler::execute(
             *packet,
             instance->stm32,
-            *instance->mqttClient
+            *instance->mqttClient,
+            instance->ntpTime,
+            instance->configManager
         );
     } else {
         LOG_WARN("STM32", "MQTT not available");

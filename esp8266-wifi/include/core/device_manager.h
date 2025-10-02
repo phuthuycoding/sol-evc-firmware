@@ -11,6 +11,7 @@
 #include "drivers/network/wifi_manager.h"
 #include "drivers/mqtt/mqtt_client.h"
 #include "drivers/communication/stm32_comm.h"
+#include "drivers/time/ntp_time.h"
 #include "utils/logger.h"
 
 /**
@@ -30,11 +31,15 @@ private:
     // Communication
     STM32Communicator stm32;
 
+    // Time synchronization
+    NTPTimeDriver ntpTime;
+
     // Status
     struct {
         bool initialized;
         uint32_t bootTime;
         uint32_t lastHeartbeat;
+        bool bootNotificationSent;
     } systemStatus;
 
     // Private methods
@@ -44,6 +49,7 @@ private:
 
     void handleHeartbeat();
     void handleMeterValues();
+    void handleBootNotification();
 
     // Callbacks
     static void mqttMessageCallback(const char* topic, const char* payload, uint16_t length);
