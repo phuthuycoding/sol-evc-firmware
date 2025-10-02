@@ -84,12 +84,27 @@ bool DeviceManager::initializeNetwork() {
         return false;
     }
 
-    // Try to connect
-    WiFiError wifiErr = wifiManager->connect();
-    if (wifiErr != WiFiError::SUCCESS) {
-        LOG_WARN("WiFi", "Connection failed, starting AP mode");
+    // Check if WiFi is configured
+    if (strlen(config.wifi.ssid) == 0) {
+        LOG_WARN("WiFi", "Not configured - starting config portal");
         wifiManager->startConfigPortal();
-        return false;
+
+        // After config portal, try to connect
+        WiFiError wifiErr = wifiManager->connect();
+        if (wifiErr != WiFiError::SUCCESS) {
+            LOG_ERROR("WiFi", "Connection failed after provisioning");
+            return false;
+        }
+    } else {
+        // Try to connect with saved credentials
+        LOG_INFO("WiFi", "Connecting to saved network: %s", config.wifi.ssid);
+        WiFiError wifiErr = wifiManager->connect();
+
+        if (wifiErr != WiFiError::SUCCESS) {
+            LOG_WARN("WiFi", "Connection failed, starting config portal");
+            wifiManager->startConfigPortal();
+            return false;
+        }
     }
 
     // Initialize MQTT

@@ -68,7 +68,7 @@ void UnifiedConfigManager::loadFactoryDefaults() {
     config.wifi.ssid[0] = '\0'; // Empty - user must configure
     config.wifi.password[0] = '\0';
     config.wifi.autoConnect = true;
-    strncpy(config.wifi.apNamePrefix, "EVSE-", sizeof(config.wifi.apNamePrefix));
+    strncpy(config.wifi.apNamePrefix, "SolEVC-Provision", sizeof(config.wifi.apNamePrefix));
     config.wifi.configPortalTimeout = 300; // 5 minutes
 
     // MQTT defaults
@@ -153,7 +153,7 @@ bool UnifiedConfigManager::load() {
     strncpy(config.wifi.ssid, doc["wifi"]["ssid"] | "", sizeof(config.wifi.ssid));
     strncpy(config.wifi.password, doc["wifi"]["password"] | "", sizeof(config.wifi.password));
     config.wifi.autoConnect = doc["wifi"]["autoConnect"] | true;
-    strncpy(config.wifi.apNamePrefix, doc["wifi"]["apNamePrefix"] | "EVSE-", sizeof(config.wifi.apNamePrefix));
+    strncpy(config.wifi.apNamePrefix, doc["wifi"]["apNamePrefix"] | "SolEVC-Provision", sizeof(config.wifi.apNamePrefix));
     config.wifi.configPortalTimeout = doc["wifi"]["configPortalTimeout"] | 300;
 
     // Load MQTT config
@@ -464,7 +464,7 @@ void buildApName(char* buffer, size_t size, const DeviceConfig& config) {
 void generateSerialFromMac(char* buffer, size_t size) {
     String mac = WiFi.macAddress();
     mac.replace(":", "");
-    snprintf(buffer, size, "EVSE-%s", mac.c_str());
+    snprintf(buffer, size, "SolEVC-Provision");
 }
 
 } // namespace ConfigHelper
