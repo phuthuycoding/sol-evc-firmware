@@ -4,7 +4,7 @@
  * @version 2.0.0
  */
 
-#include "communication/stm32_comm.h"
+#include "drivers/communication/stm32_comm.h"
 
 /**
  * @brief Constructor

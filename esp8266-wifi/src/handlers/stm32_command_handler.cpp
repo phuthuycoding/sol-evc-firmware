@@ -9,6 +9,7 @@
 #include "handlers/ocpp_message_handler.h"
 #include "utils/logger.h"
 #include <ArduinoJson.h>
+#include <ESP8266WiFi.h>
 
 void STM32CommandHandler::execute(
     const uart_packet_t& packet,
@@ -121,7 +122,7 @@ void STM32CommandHandler::handleWiFiStatus(
 
     // Use proper payload structure
     wifi_status_payload_t wifiData;
-    wifiData.wifi_connected = WiFi.isConnected() ? 1 : 0;
+    wifiData.wifi_connected = (WiFi.status() == WL_CONNECTED) ? 1 : 0;
     wifiData.mqtt_connected = 0;  // TODO: Get from MQTTClient
     wifiData.rssi = WiFi.RSSI();
     wifiData.uptime = millis() / 1000;
@@ -183,8 +184,8 @@ void STM32CommandHandler::handlePublishMeterValues(
 
     LOG_DEBUG("STM32Cmd", "Meter values: E=%u Wh, V=%u V, I=%u A, P=%u W",
              meterData.sample.energy_wh,
-             meterData.sample.voltage_mv / 1000,
-             meterData.sample.current_ma / 1000,
+             meterData.sample.voltage_v,
+             meterData.sample.current_a,
              meterData.sample.power_w);
 
     // Publish to MQTT via OCPPMessageHandler

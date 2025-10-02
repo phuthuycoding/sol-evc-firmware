@@ -3,14 +3,14 @@
  * @brief WiFi Manager implementation
  */
 
-#include "network/wifi_manager.h"
+#include "drivers/network/wifi_manager.h"
 
-WiFiManager::WiFiManager(const DeviceConfig& cfg)
+CustomWiFiManager::CustomWiFiManager(const DeviceConfig& cfg)
     : config(cfg), lastReconnectAttempt(0) {
     memset(&status, 0, sizeof(WiFiStatus));
 }
 
-WiFiError WiFiManager::init() {
+WiFiError CustomWiFiManager::init() {
     WiFi.mode(WIFI_STA);
     wifiManagerLib.setConfigPortalTimeout(config.wifi.configPortalTimeout);
 
@@ -18,7 +18,7 @@ WiFiError WiFiManager::init() {
     return WiFiError::SUCCESS;
 }
 
-WiFiError WiFiManager::connect() {
+WiFiError CustomWiFiManager::connect() {
     if (WiFi.status() == WL_CONNECTED) {
         return WiFiError::ALREADY_CONNECTED;
     }
@@ -48,12 +48,12 @@ WiFiError WiFiManager::connect() {
     return WiFiError::CONNECTION_FAILED;
 }
 
-void WiFiManager::disconnect() {
+void CustomWiFiManager::disconnect() {
     WiFi.disconnect();
     status.connected = false;
 }
 
-WiFiError WiFiManager::startConfigPortal() {
+WiFiError CustomWiFiManager::startConfigPortal() {
     char apName[32];
     ConfigHelper::buildApName(apName, sizeof(apName), config);
 
@@ -68,7 +68,7 @@ WiFiError WiFiManager::startConfigPortal() {
     return WiFiError::TIMEOUT;
 }
 
-void WiFiManager::handle() {
+void CustomWiFiManager::handle() {
     if (WiFi.status() != WL_CONNECTED) {
         status.connected = false;
 
@@ -86,11 +86,11 @@ void WiFiManager::handle() {
     }
 }
 
-bool WiFiManager::isConnected() const {
+bool CustomWiFiManager::isConnected() const {
     return WiFi.status() == WL_CONNECTED;
 }
 
-void WiFiManager::updateStatus() {
+void CustomWiFiManager::updateStatus() {
     status.connected = (WiFi.status() == WL_CONNECTED);
     status.rssi = WiFi.RSSI();
     status.ipAddress = WiFi.localIP();

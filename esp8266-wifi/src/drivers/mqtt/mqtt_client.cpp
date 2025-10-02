@@ -108,7 +108,7 @@ void MQTTClient::disconnect() {
  * @brief Check if connected
  */
 bool MQTTClient::isConnected() const {
-    return client.connected();
+    return const_cast<PubSubClient&>(client).connected();
 }
 
 /**

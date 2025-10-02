@@ -78,7 +78,7 @@ bool DeviceManager::initializeNetwork() {
     const DeviceConfig& config = configManager.get();
 
     // Initialize WiFi
-    wifiManager = new WiFiManager(config);
+    wifiManager = new CustomWiFiManager(config);
     if (wifiManager->init() != WiFiError::SUCCESS) {
         LOG_ERROR("WiFi", "Initialization failed");
         return false;
@@ -194,9 +194,10 @@ void DeviceManager::handleBootNotification() {
 
     boot_notification_t bootData;
     strncpy(bootData.firmware_version, FIRMWARE_VERSION, sizeof(bootData.firmware_version) - 1);
-    strncpy(bootData.station_id, configManager.get().stationId, sizeof(bootData.station_id) - 1);
-    bootData.boot_reason = 1;  // PowerUp (can be extended)
-    bootData.timestamp = ntpTime.getUnixTime();
+    strncpy(bootData.charge_point_vendor, DEVICE_VENDOR, sizeof(bootData.charge_point_vendor) - 1);
+    strncpy(bootData.charge_point_model, DEVICE_MODEL, sizeof(bootData.charge_point_model) - 1);
+    strncpy(bootData.charge_point_serial_number, configManager.get().deviceId, sizeof(bootData.charge_point_serial_number) - 1);
+    snprintf(bootData.timestamp, sizeof(bootData.timestamp), "%u", ntpTime.getUnixTime());
 
     OCPPMessageHandler::publishBootNotification(
         *mqttClient,
@@ -234,6 +235,6 @@ void DeviceManager::stm32PacketCallback(const uart_packet_t* packet) {
         );
     } else {
         LOG_WARN("STM32", "MQTT not available");
-        instance->stm32.sendAck(packet->sequence, STATUS_NOT_READY);
+        instance->stm32.sendAck(packet->sequence, STATUS_ERROR);
     }
 }

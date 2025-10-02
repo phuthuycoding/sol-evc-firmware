@@ -25,7 +25,7 @@ private:
     UnifiedConfigManager configManager;
 
     // Network components (stack allocated)
-    WiFiManager* wifiManager;
+    CustomWiFiManager* wifiManager;
     MQTTClient* mqttClient;
 
     // Communication

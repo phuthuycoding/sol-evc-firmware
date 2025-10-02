@@ -38,9 +38,9 @@ struct WiFiStatus {
 };
 
 /**
- * @brief WiFi Manager
+ * @brief Custom WiFi Manager (wrapper around WiFiManager library)
  */
-class WiFiManager {
+class CustomWiFiManager {
 private:
     const DeviceConfig& config;
     ::WiFiManager wifiManagerLib;
@@ -52,7 +52,7 @@ private:
     void updateStatus();
 
 public:
-    explicit WiFiManagerOOP(const DeviceConfig& cfg);
+    explicit CustomWiFiManager(const DeviceConfig& cfg);
 
     WiFiError init();
     WiFiError connect();
@@ -64,8 +64,8 @@ public:
     const WiFiStatus& getStatus() const { return status; }
 
     // Prevent copying
-    WiFiManager(const WiFiManager&) = delete;
-    WiFiManager& operator=(const WiFiManager&) = delete;
+    CustomWiFiManager(const CustomWiFiManager&) = delete;
+    CustomWiFiManager& operator=(const CustomWiFiManager&) = delete;
 };
 
 #endif // WIFI_MANAGER_H

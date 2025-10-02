@@ -32,7 +32,7 @@ public:
      */
     static bool execute(
         MQTTClient& mqtt,
-        WiFiManager& wifi,
+        CustomWiFiManager& wifi,
         const DeviceConfig& config,
         uint32_t bootTime
     );
