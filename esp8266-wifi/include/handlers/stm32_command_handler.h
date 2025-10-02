@@ -45,7 +45,7 @@ private:
     // Internal handlers
     static void handleMqttPublish(const uart_packet_t& packet, STM32Communicator& stm32, MQTTClient& mqtt);
     static void handleGetTime(const uart_packet_t& packet, STM32Communicator& stm32, NTPTimeDriver& ntpTime);
-    static void handleWiFiStatus(const uart_packet_t& packet, STM32Communicator& stm32);
+    static void handleWiFiStatus(const uart_packet_t& packet, STM32Communicator& stm32, MQTTClient& mqtt);
     static void handleConfigUpdate(const uart_packet_t& packet, STM32Communicator& stm32, UnifiedConfigManager& configManager);
     static void handleOTARequest(const uart_packet_t& packet, STM32Communicator& stm32);
     static void handlePublishMeterValues(const uart_packet_t& packet, STM32Communicator& stm32, MQTTClient& mqtt, const DeviceConfig& config);

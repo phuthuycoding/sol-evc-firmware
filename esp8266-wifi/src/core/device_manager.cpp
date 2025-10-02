@@ -17,6 +17,8 @@ DeviceManager* DeviceManager::instance = nullptr;
 DeviceManager::DeviceManager()
     : wifiManager(nullptr),
       mqttClient(nullptr),
+      webServer(nullptr),
+      webAPIHandler(nullptr),
       stm32(),
       ntpTime() {
 
@@ -27,6 +29,8 @@ DeviceManager::DeviceManager()
 DeviceManager::~DeviceManager() {
     if (wifiManager) delete wifiManager;
     if (mqttClient) delete mqttClient;
+    if (webServer) delete webServer;
+    if (webAPIHandler) delete webAPIHandler;
     instance = nullptr;
 }
 
@@ -47,8 +51,15 @@ bool DeviceManager::init() {
         return false;
     }
 
+    // Initialize network and web server
     if (!initializeNetwork()) {
-        LOG_WARN("DeviceManager", "Network initialization failed, will retry");
+        LOG_WARN("DeviceManager", "Network initialization failed - starting provisioning mode");
+        systemStatus.provisioningMode = true;
+    }
+
+    if (!initializeWebServer()) {
+        LOG_ERROR("DeviceManager", "Web server initialization failed");
+        return false;
     }
 
     systemStatus.initialized = true;
@@ -86,41 +97,82 @@ bool DeviceManager::initializeNetwork() {
 
     // Check if WiFi is configured
     if (strlen(config.wifi.ssid) == 0) {
-        LOG_WARN("WiFi", "Not configured - starting config portal");
-        wifiManager->startConfigPortal();
-
-        // After config portal, try to connect
-        WiFiError wifiErr = wifiManager->connect();
-        if (wifiErr != WiFiError::SUCCESS) {
-            LOG_ERROR("WiFi", "Connection failed after provisioning");
-            return false;
-        }
-    } else {
-        // Try to connect with saved credentials
-        LOG_INFO("WiFi", "Connecting to saved network: %s", config.wifi.ssid);
-        WiFiError wifiErr = wifiManager->connect();
-
-        if (wifiErr != WiFiError::SUCCESS) {
-            LOG_WARN("WiFi", "Connection failed, starting config portal");
-            wifiManager->startConfigPortal();
-            return false;
-        }
+        LOG_WARN("WiFi", "Not configured - starting AP mode for provisioning");
+        wifiManager->startAPMode();
+        return false;  // Provisioning mode - will serve web UI
     }
 
-    // Initialize MQTT
+    // Try to connect with saved credentials
+    LOG_INFO("WiFi", "Connecting to saved network: %s", config.wifi.ssid);
+    WiFiError wifiErr = wifiManager->connect();
+
+    if (wifiErr != WiFiError::SUCCESS) {
+        LOG_WARN("WiFi", "Connection failed, starting AP mode");
+        wifiManager->startAPMode();
+        return false;  // Provisioning mode
+    }
+
+    // Initialize MQTT (only if WiFi connected)
     mqttClient = new MQTTClient(config);
     mqttClient->setCallback(mqttMessageCallback);
 
     MQTTError mqttErr = mqttClient->connect();
     if (mqttErr != MQTTError::SUCCESS) {
         LOG_WARN("MQTT", "Connection failed, will retry");
-        return false;
     }
 
     // Initialize NTP time
     ntpTime.init("pool.ntp.org", 0);  // UTC, can be configured from config later
 
-    LOG_INFO("Network", "WiFi and MQTT connected");
+    LOG_INFO("Network", "WiFi connected");
+    return true;
+}
+
+bool DeviceManager::initializeWebServer() {
+    LOG_INFO("WebServer", "Initializing web server...");
+
+    // Create web server
+    webServer = new WebServerDriver(80);
+    if (!webServer->init()) {
+        LOG_ERROR("WebServer", "Failed to initialize");
+        return false;
+    }
+
+    // Create API handler (needs WiFi and MQTT references)
+    if (!wifiManager) {
+        LOG_ERROR("WebServer", "WiFi manager not initialized");
+        return false;
+    }
+
+    // MQTT may be null in provisioning mode - handler will check
+    if (!mqttClient) {
+        mqttClient = new MQTTClient(configManager.get());
+        mqttClient->setCallback(mqttMessageCallback);
+    }
+
+    const DeviceConfig& config = configManager.get();
+    webAPIHandler = new WebAPIHandler(wifiManager, mqttClient, &configManager, config.deviceId);
+
+    // Register API routes
+    webAPIHandler->registerRoutes(webServer->getServer());
+
+    // Serve static files from LittleFS (compressed files in /www_compressed/)
+    webServer->serveStatic("/", "/www_compressed/");
+
+    // Start server
+    if (!webServer->start()) {
+        LOG_ERROR("WebServer", "Failed to start");
+        return false;
+    }
+
+    LOG_INFO("WebServer", "Web server running on port 80");
+
+    if (wifiManager->isAPMode()) {
+        LOG_INFO("WebServer", "Provisioning UI available at http://192.168.4.1");
+    } else {
+        LOG_INFO("WebServer", "Web UI available at http://%s", WiFi.localIP().toString().c_str());
+    }
+
     return true;
 }
 

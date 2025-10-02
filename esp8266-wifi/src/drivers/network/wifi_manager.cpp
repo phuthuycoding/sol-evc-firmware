@@ -1,9 +1,11 @@
 /**
  * @file wifi_manager.cpp
- * @brief WiFi Manager implementation
+ * @brief WiFi Manager implementation (native - no WiFiManager library)
+ * @version 3.0.0
  */
 
 #include "drivers/network/wifi_manager.h"
+#include "utils/logger.h"
 
 CustomWiFiManager::CustomWiFiManager(const DeviceConfig& cfg)
     : config(cfg), lastReconnectAttempt(0) {
@@ -11,10 +13,13 @@ CustomWiFiManager::CustomWiFiManager(const DeviceConfig& cfg)
 }
 
 WiFiError CustomWiFiManager::init() {
+    // Start in STA mode by default
     WiFi.mode(WIFI_STA);
-    wifiManagerLib.setConfigPortalTimeout(config.wifi.configPortalTimeout);
+    WiFi.persistent(false);  // Don't save to flash
+    WiFi.setAutoConnect(false);
+    WiFi.setAutoReconnect(true);
 
-    Serial.println(F("[WiFi] Initialized"));
+    LOG_INFO("WiFi", "Initialized in STA mode");
     return WiFiError::SUCCESS;
 }
 
@@ -24,26 +29,33 @@ WiFiError CustomWiFiManager::connect() {
     }
 
     if (strlen(config.wifi.ssid) == 0) {
+        LOG_WARN("WiFi", "No SSID configured");
         return WiFiError::NOT_CONFIGURED;
     }
 
-    Serial.printf("[WiFi] Connecting to: %s\n", config.wifi.ssid);
-    WiFi.begin(config.wifi.ssid, config.wifi.password);
+    return connectToNetwork(config.wifi.ssid, config.wifi.password);
+}
+
+WiFiError CustomWiFiManager::connectToNetwork(const char* ssid, const char* password) {
+    LOG_INFO("WiFi", "Connecting to: %s", ssid);
+
+    WiFi.begin(ssid, password);
 
     uint8_t attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
         delay(500);
-        Serial.print(".");
         attempts++;
+        ESP.wdtFeed();
     }
 
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println(F("\n[WiFi] Connected"));
-        Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+        LOG_INFO("WiFi", "Connected! IP: %s", WiFi.localIP().toString().c_str());
+        status.apMode = false;
         updateStatus();
         return WiFiError::SUCCESS;
     }
 
+    LOG_ERROR("WiFi", "Connection failed");
     status.disconnectCount++;
     return WiFiError::CONNECTION_FAILED;
 }
@@ -51,30 +63,41 @@ WiFiError CustomWiFiManager::connect() {
 void CustomWiFiManager::disconnect() {
     WiFi.disconnect();
     status.connected = false;
+    LOG_INFO("WiFi", "Disconnected");
 }
 
-WiFiError CustomWiFiManager::startConfigPortal() {
+WiFiError CustomWiFiManager::startAPMode() {
     char apName[32];
-    ConfigHelper::buildApName(apName, sizeof(apName), config);
+    snprintf(apName, sizeof(apName), "SolEVC-%06X", ESP.getChipId());
 
-    Serial.printf("[WiFi] Starting AP: %s\n", apName);
+    LOG_INFO("WiFi", "Starting AP mode: %s", apName);
 
-    if (wifiManagerLib.startConfigPortal(apName)) {
-        status.apMode = false;
-        updateStatus();
+    WiFi.mode(WIFI_AP);
+
+    if (WiFi.softAP(apName)) {
+        status.apMode = true;
+        status.connected = false;
+        LOG_INFO("WiFi", "AP started. IP: %s", WiFi.softAPIP().toString().c_str());
         return WiFiError::SUCCESS;
     }
 
-    return WiFiError::TIMEOUT;
+    LOG_ERROR("WiFi", "Failed to start AP");
+    return WiFiError::CONNECTION_FAILED;
 }
 
 void CustomWiFiManager::handle() {
+    // Skip reconnection if in AP mode
+    if (status.apMode) {
+        return;
+    }
+
     if (WiFi.status() != WL_CONNECTED) {
         status.connected = false;
 
         if (config.wifi.autoConnect) {
             uint32_t now = millis();
             if (now - lastReconnectAttempt > RECONNECT_INTERVAL) {
+                LOG_INFO("WiFi", "Auto-reconnecting...");
                 connect();
                 lastReconnectAttempt = now;
             }
@@ -87,7 +110,7 @@ void CustomWiFiManager::handle() {
 }
 
 bool CustomWiFiManager::isConnected() const {
-    return WiFi.status() == WL_CONNECTED;
+    return WiFi.status() == WL_CONNECTED && !status.apMode;
 }
 
 void CustomWiFiManager::updateStatus() {
@@ -98,6 +121,7 @@ void CustomWiFiManager::updateStatus() {
 
     if (status.connected) {
         status.connectTime = millis();
-        strncpy(status.ssid, WiFi.SSID().c_str(), sizeof(status.ssid));
+        strncpy(status.ssid, WiFi.SSID().c_str(), sizeof(status.ssid) - 1);
+        status.ssid[sizeof(status.ssid) - 1] = '\0';
     }
 }

@@ -1,7 +1,7 @@
 /**
  * @file wifi_manager.h
- * @brief WiFi Manager (ESP8266 optimized)
- * @version 2.0.0
+ * @brief WiFi Manager (ESP8266 optimized - without WiFiManager library)
+ * @version 3.0.0
  */
 
 #ifndef WIFI_MANAGER_H
@@ -9,7 +9,6 @@
 
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <WiFiManager.h>
 #include "../config/unified_config.h"
 
 /**
@@ -38,12 +37,11 @@ struct WiFiStatus {
 };
 
 /**
- * @brief Custom WiFi Manager (wrapper around WiFiManager library)
+ * @brief Custom WiFi Manager (native implementation)
  */
 class CustomWiFiManager {
 private:
     const DeviceConfig& config;
-    ::WiFiManager wifiManagerLib;
     WiFiStatus status;
     uint32_t lastReconnectAttempt;
 
@@ -56,11 +54,13 @@ public:
 
     WiFiError init();
     WiFiError connect();
+    WiFiError connectToNetwork(const char* ssid, const char* password);
     void disconnect();
-    WiFiError startConfigPortal();
+    WiFiError startAPMode();
     void handle();
 
     bool isConnected() const;
+    bool isAPMode() const { return status.apMode; }
     const WiFiStatus& getStatus() const { return status; }
 
     // Prevent copying

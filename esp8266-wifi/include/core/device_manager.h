@@ -1,7 +1,7 @@
 /**
  * @file device_manager.h
  * @brief Main device orchestrator
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 #ifndef DEVICE_MANAGER_H
@@ -9,9 +9,11 @@
 
 #include "drivers/config/unified_config.h"
 #include "drivers/network/wifi_manager.h"
+#include "drivers/network/web_server.h"
 #include "drivers/mqtt/mqtt_client.h"
 #include "drivers/communication/stm32_comm.h"
 #include "drivers/time/ntp_time.h"
+#include "handlers/web_api_handler.h"
 #include "utils/logger.h"
 
 /**
@@ -24,9 +26,11 @@ private:
     // Config manager
     UnifiedConfigManager configManager;
 
-    // Network components (stack allocated)
+    // Network components (heap allocated)
     CustomWiFiManager* wifiManager;
     MQTTClient* mqttClient;
+    WebServerDriver* webServer;
+    WebAPIHandler* webAPIHandler;
 
     // Communication
     STM32Communicator stm32;
@@ -40,11 +44,13 @@ private:
         uint32_t bootTime;
         uint32_t lastHeartbeat;
         bool bootNotificationSent;
+        bool provisioningMode;
     } systemStatus;
 
     // Private methods
     bool initializeConfig();
     bool initializeNetwork();
+    bool initializeWebServer();
     bool initializeCommunication();
 
     void handleHeartbeat();

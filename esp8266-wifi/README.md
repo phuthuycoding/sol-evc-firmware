@@ -14,7 +14,11 @@ cd esp8266-wifi
 pio run
 
 # Upload to device
-pio run -t upload
+pio run --target upload
+
+
+# Upload to device web ui
+pio run --target uploadfs 
 
 # Monitor serial output
 pio device monitor

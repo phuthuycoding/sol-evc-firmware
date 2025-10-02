@@ -30,7 +30,7 @@ void STM32CommandHandler::execute(
             break;
 
         case CMD_WIFI_STATUS:
-            handleWiFiStatus(packet, stm32);
+            handleWiFiStatus(packet, stm32, mqtt);
             break;
 
         case CMD_CONFIG_UPDATE:
@@ -114,7 +114,8 @@ void STM32CommandHandler::handleGetTime(
 
 void STM32CommandHandler::handleWiFiStatus(
     const uart_packet_t& packet,
-    STM32Communicator& stm32
+    STM32Communicator& stm32,
+    MQTTClient& mqtt
 ) {
     // Create WiFi status response
     uart_packet_t response;
@@ -123,7 +124,7 @@ void STM32CommandHandler::handleWiFiStatus(
     // Use proper payload structure
     wifi_status_payload_t wifiData;
     wifiData.wifi_connected = (WiFi.status() == WL_CONNECTED) ? 1 : 0;
-    wifiData.mqtt_connected = 0;  // TODO: Get from MQTTClient
+    wifiData.mqtt_connected = mqtt.isConnected() ? 1 : 0;
     wifiData.rssi = WiFi.RSSI();
     wifiData.uptime = millis() / 1000;
 
