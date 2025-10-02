@@ -10,7 +10,7 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
-#include "config/unified_config.h"
+#include "../config/unified_config.h"
 
 /**
  * @brief WiFi error codes

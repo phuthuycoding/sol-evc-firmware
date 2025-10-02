@@ -17,7 +17,7 @@
 #include <PubSubClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
-#include "config/unified_config.h"
+#include "../config/unified_config.h"
 
 /**
  * @brief Error codes for MQTT operations

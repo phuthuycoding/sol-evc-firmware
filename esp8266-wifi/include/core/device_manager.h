@@ -7,10 +7,10 @@
 #ifndef DEVICE_MANAGER_H
 #define DEVICE_MANAGER_H
 
-#include "config/unified_config.h"
-#include "network/wifi_manager.h"
-#include "mqtt/mqtt_client.h"
-#include "communication/stm32_comm.h"
+#include "drivers/config/unified_config.h"
+#include "drivers/network/wifi_manager.h"
+#include "drivers/mqtt/mqtt_client.h"
+#include "drivers/communication/stm32_comm.h"
 #include "utils/logger.h"
 
 /**

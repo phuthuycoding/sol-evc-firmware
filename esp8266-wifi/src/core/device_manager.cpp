@@ -4,7 +4,11 @@
  */
 
 #include "core/device_manager.h"
+#include "handlers/heartbeat_handler.h"
+#include "handlers/stm32_command_handler.h"
 #include <ArduinoJson.h>
+
+// Note: All driver headers now in drivers/ subdirectory
 
 DeviceManager* DeviceManager::instance = nullptr;
 
@@ -138,24 +142,15 @@ void DeviceManager::run() {
 }
 
 void DeviceManager::handleHeartbeat() {
-    if (!mqttClient || !mqttClient->isConnected()) return;
+    if (!mqttClient || !wifiManager) return;
 
-    const DeviceConfig& config = configManager.get();
-
-    StaticJsonDocument<512> doc;
-    doc["msgId"] = String(millis());
-    doc["uptime"] = (millis() - systemStatus.bootTime) / 1000;
-    doc["rssi"] = wifiManager ? wifiManager->getStatus().rssi : 0;
-    doc["freeHeap"] = ESP.getFreeHeap();
-
-    String payload;
-    serializeJson(doc, payload);
-
-    char topic[128];
-    MQTTTopicBuilder::buildHeartbeat(topic, sizeof(topic), config);
-
-    mqttClient->publish(topic, payload.c_str());
-    LOG_DEBUG("Heartbeat", "Sent (heap: %u bytes)", ESP.getFreeHeap());
+    // Use handler (stateless, stack-based)
+    HeartbeatHandler::execute(
+        *mqttClient,
+        *wifiManager,
+        configManager.get(),
+        systemStatus.bootTime
+    );
 }
 
 void DeviceManager::handleMeterValues() {
@@ -176,26 +171,17 @@ void DeviceManager::mqttMessageCallback(const char* topic, const char* payload, 
 }
 
 void DeviceManager::stm32PacketCallback(const uart_packet_t* packet) {
-    if (!instance) return;
+    if (!instance || !packet) return;
 
-    LOG_DEBUG("STM32", "RX: CMD=0x%02X", packet->cmd_type);
-
-    switch (packet->cmd_type) {
-        case CMD_MQTT_PUBLISH:
-            if (instance->mqttClient) {
-                StaticJsonDocument<512> doc;
-                if (deserializeJson(doc, (char*)packet->payload) == DeserializationError::Ok) {
-                    const char* topic = doc["topic"];
-                    const char* data = doc["data"];
-                    instance->mqttClient->publish(topic, data);
-                }
-            }
-            instance->stm32.sendAck(packet->sequence, STATUS_SUCCESS);
-            break;
-
-        default:
-            LOG_WARN("STM32", "Unknown command: 0x%02X", packet->cmd_type);
-            instance->stm32.sendAck(packet->sequence, STATUS_INVALID);
-            break;
+    // Use handler (stateless, all logic in handler)
+    if (instance->mqttClient) {
+        STM32CommandHandler::execute(
+            *packet,
+            instance->stm32,
+            *instance->mqttClient
+        );
+    } else {
+        LOG_WARN("STM32", "MQTT not available");
+        instance->stm32.sendAck(packet->sequence, STATUS_NOT_READY);
     }
 }

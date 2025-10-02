@@ -42,8 +42,8 @@ void setup() {
     // Print banner
     Serial.println(F("\n\n"));
     Serial.println(F("╔════════════════════════════════════════╗"));
-    Serial.println(F("║  ESP8266 EVSE WiFi Module v2.0 (OOP)  ║"));
-    Serial.println(F("║     Refactored Clean Architecture     ║"));
+    Serial.println(F("║  ESP8266 EVSE WiFi Module v2.0        ║"));
+    Serial.println(F("║  Architecture: Handlers + Drivers     ║"));
     Serial.println(F("╚════════════════════════════════════════╝\n"));
 
     // Initialize logger
