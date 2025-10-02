@@ -79,23 +79,18 @@ void STM32CommandHandler::handleGetTime(
     uart_packet_t response;
     uart_init_packet(&response, RSP_TIME_DATA, packet.sequence);
 
-    // Build time payload (unix timestamp)
-    struct {
-        uint32_t timestamp;
-        int16_t timezone;
-        uint8_t synced;
-    } timeData;
-
-    timeData.timestamp = millis() / 1000;  // TODO: Use NTP time
-    timeData.timezone = 0;  // UTC
-    timeData.synced = 0;    // Not synced yet
+    // Build time payload
+    time_data_payload_t timeData;
+    timeData.unix_timestamp = millis() / 1000;  // TODO: Use NTP time when available
+    timeData.timezone_offset = 0;  // UTC (TODO: Get from config)
+    timeData.ntp_synced = 0;       // Not synced yet (TODO: Check NTP status)
 
     memcpy(response.payload, &timeData, sizeof(timeData));
     response.length = sizeof(timeData);
 
     // Send response
     stm32.sendPacket(response);
-    LOG_DEBUG("STM32Cmd", "Time sent: %u", timeData.timestamp);
+    LOG_DEBUG("STM32Cmd", "Time sent: %u (synced: %d)", timeData.unix_timestamp, timeData.ntp_synced);
 }
 
 void STM32CommandHandler::handleWiFiStatus(
@@ -106,23 +101,21 @@ void STM32CommandHandler::handleWiFiStatus(
     uart_packet_t response;
     uart_init_packet(&response, RSP_WIFI_STATUS, packet.sequence);
 
-    struct {
-        uint8_t connected;
-        int8_t rssi;
-        uint8_t ipAddress[4];
-    } wifiData;
-
-    wifiData.connected = WiFi.isConnected() ? 1 : 0;
+    // Use proper payload structure
+    wifi_status_payload_t wifiData;
+    wifiData.wifi_connected = WiFi.isConnected() ? 1 : 0;
+    wifiData.mqtt_connected = 0;  // TODO: Get from MQTTClient
     wifiData.rssi = WiFi.RSSI();
+    wifiData.uptime = millis() / 1000;
 
-    if (wifiData.connected) {
+    if (wifiData.wifi_connected) {
         IPAddress ip = WiFi.localIP();
-        wifiData.ipAddress[0] = ip[0];
-        wifiData.ipAddress[1] = ip[1];
-        wifiData.ipAddress[2] = ip[2];
-        wifiData.ipAddress[3] = ip[3];
+        wifiData.ip_address[0] = ip[0];
+        wifiData.ip_address[1] = ip[1];
+        wifiData.ip_address[2] = ip[2];
+        wifiData.ip_address[3] = ip[3];
     } else {
-        memset(wifiData.ipAddress, 0, 4);
+        memset(wifiData.ip_address, 0, 4);
     }
 
     memcpy(response.payload, &wifiData, sizeof(wifiData));
@@ -130,5 +123,5 @@ void STM32CommandHandler::handleWiFiStatus(
 
     // Send response
     stm32.sendPacket(response);
-    LOG_DEBUG("STM32Cmd", "WiFi status sent");
+    LOG_DEBUG("STM32Cmd", "WiFi status: connected=%d, RSSI=%d", wifiData.wifi_connected, wifiData.rssi);
 }

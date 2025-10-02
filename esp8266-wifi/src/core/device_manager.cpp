@@ -6,6 +6,7 @@
 #include "core/device_manager.h"
 #include "handlers/heartbeat_handler.h"
 #include "handlers/stm32_command_handler.h"
+#include "handlers/mqtt_incoming_handler.h"
 #include <ArduinoJson.h>
 
 // Note: All driver headers now in drivers/ subdirectory
@@ -166,8 +167,14 @@ void DeviceManager::handleMeterValues() {
 void DeviceManager::mqttMessageCallback(const char* topic, const char* payload, uint16_t length) {
     if (!instance) return;
 
-    LOG_INFO("MQTT", "RX: %s -> %s", topic, payload);
-    // TODO: Handle MQTT commands
+    // Use handler to process and forward to STM32
+    MQTTIncomingHandler::execute(
+        topic,
+        payload,
+        length,
+        instance->stm32,
+        instance->configManager.get()
+    );
 }
 
 void DeviceManager::stm32PacketCallback(const uart_packet_t* packet) {
